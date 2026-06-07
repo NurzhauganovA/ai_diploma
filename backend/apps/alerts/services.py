@@ -55,9 +55,16 @@ def send_notification(notification_id: int):
         notif.message = message
 
         if rule.channel == "telegram":
-            _send_telegram(settings.TELEGRAM_BOT_TOKEN, rule.telegram_chat_id, message)
+            # Send to rule-specific chat_id OR global TELEGRAM_CHAT_ID
+            chat_id = rule.telegram_chat_id or getattr(settings, "TELEGRAM_CHAT_ID", "")
+            _send_telegram(settings.TELEGRAM_BOT_TOKEN, chat_id, message)
         elif rule.channel == "email":
             _send_email(rule.email_recipients, rule.name, message)
+
+        # Also send to global Telegram chat for all high/critical alerts
+        global_chat = getattr(settings, "TELEGRAM_CHAT_ID", "")
+        if global_chat and rule.channel != "telegram" and getattr(article, "urgency", "") in ("high", "critical"):
+            _send_telegram(settings.TELEGRAM_BOT_TOKEN, global_chat, message)
 
         # Always mark in-app
         notif.status = "sent"

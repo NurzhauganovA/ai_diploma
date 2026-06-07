@@ -9,12 +9,13 @@ x-backend-env: &backend-env
     DEBUG: "True"
     SECRET_KEY: "fakeguard-dev-secret-key-change-in-production"
     REDIS_URL: "redis://redis:6379/0"
-    # SQLite хранится в /app/data/ — туда монтируется volume (директория, не файл)
     DB_PATH: "/app/data/db.sqlite3"
-    # Компания для мониторинга (Google News RSS + ведущие СМИ)
     MONITORED_COMPANY: "Яндекс"
-    TELEGRAM_BOT_TOKEN: ""
-    OPENAI_API_KEY: ""
+    # Gemini AI — анализ статей (оставь пустым для keyword-fallback)
+    GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+    # Telegram Bot — уведомления и команды
+    TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+    TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID:-}"
 
 x-backend-volumes: &backend-volumes
   volumes:
@@ -49,7 +50,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 40s
+      start_period: 60s
 
   # ── Celery Worker ─────────────────────────────
   celery:
@@ -75,7 +76,29 @@ services:
         condition: service_healthy
     command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 
-  # ── Nginx + React (production build) ──────────
+  # ── Telegram Bot ──────────────────────────────
+  # Запускается только если TELEGRAM_BOT_TOKEN задан
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    restart: unless-stopped
+    <<: [*backend-env, *backend-volumes]
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: >
+      sh -c "
+        if [ -z \"$$TELEGRAM_BOT_TOKEN\" ]; then
+          echo '⚠️  TELEGRAM_BOT_TOKEN не задан. Telegram Bot не запущен.';
+          echo '   Добавь токен в .env и перезапусти: docker compose up -d telegram-bot';
+          sleep infinity;
+        else
+          python manage.py run_telegram_bot;
+        fi
+      "
+
+  # ── Nginx + React ─────────────────────────────
   nginx:
     build:
       context: .

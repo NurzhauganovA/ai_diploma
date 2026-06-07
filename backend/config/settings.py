@@ -11,8 +11,15 @@ SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-dev-key-change-in-producti
 
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
-# Компания для мониторинга (используется при инициализации и фильтрации)
+# Компания для мониторинга
 MONITORED_COMPANY = os.getenv("MONITORED_COMPANY", "Яндекс")
+
+# Gemini AI
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# Telegram Bot
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 ALLOWED_HOSTS = ["*"]
 

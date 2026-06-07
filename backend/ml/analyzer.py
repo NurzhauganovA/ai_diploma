@@ -294,10 +294,43 @@ def extract_keywords(text: str, top_n: int = 10) -> list:
 def full_analyze(text: str, title: str = "", source_credibility: float = 0.7, company_keywords: list = None) -> dict:
     """
     Full analysis pipeline.
-    Returns all ML metrics for an article.
+    Priority: Gemini AI → keyword-based fallback.
     """
     full_text = (title + " " + text).strip()
 
+    # ── Try Gemini AI first ──────────────────────────────────────
+    try:
+        from ml.gemini_analyzer import analyze_with_gemini, is_gemini_available
+        if is_gemini_available():
+            gemini = analyze_with_gemini(title, text, source_credibility)
+            if gemini:
+                entities = extract_entities(full_text, company_keywords)
+                # Merge Gemini results with entity extraction
+                shap_data = {
+                    "top_signals": [gemini.get("explanation", "")],
+                    "ai_analyzed": True,
+                    "model": "gemini-1.5-flash",
+                    "summary": gemini.get("summary", ""),
+                    "fake_score_components": {
+                        "ai_confidence": 1.0,
+                        "source_credibility_penalty": round((1 - source_credibility) * 0.3, 2),
+                    },
+                }
+                return {
+                    "fake_score": gemini["fake_score"],
+                    "sentiment": gemini["sentiment"],
+                    "sentiment_score": gemini["sentiment_score"],
+                    "toxicity_score": round(gemini["toxicity_score"], 3),
+                    "urgency": gemini["urgency"],
+                    "topic": gemini.get("topic", ""),
+                    "entities": entities,
+                    "keywords": gemini.get("keywords", []),
+                    "shap_data": shap_data,
+                }
+    except Exception as e:
+        logger.warning(f"Gemini failed, falling back to keyword analysis: {e}")
+
+    # ── Keyword-based fallback ───────────────────────────────────
     sentiment_result = analyze_sentiment(full_text)
     fake_result = analyze_fake(full_text, source_credibility)
     toxicity = analyze_toxicity(full_text)
@@ -311,10 +344,10 @@ def full_analyze(text: str, title: str = "", source_credibility: float = 0.7, co
         source_credibility,
     )
 
-    # Build simple SHAP-like explanation
     shap_data = {
         "top_signals": fake_result.get("explanation", []),
-        "sentiment_drivers": [],
+        "ai_analyzed": False,
+        "model": "keyword-based",
         "fake_score_components": {
             "keyword_signals": round(len(fake_result.get("explanation", [])) * 0.1, 2),
             "source_credibility_penalty": round((1 - source_credibility) * 0.3, 2),

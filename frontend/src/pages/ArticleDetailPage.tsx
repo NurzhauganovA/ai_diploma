@@ -120,8 +120,26 @@ export default function ArticleDetailPage() {
       {article.shap_data && (article.shap_data.top_signals?.length > 0 || (article.keywords && article.keywords.length > 0)) && (
         <div className="card">
           <div className="text-sm font-medium text-gray-400 mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" /> Объяснение AI (SHAP-анализ)
+            <AlertTriangle className="w-4 h-4" />
+            Объяснение AI (SHAP-анализ)
+            {article.shap_data.ai_analyzed && (
+              <span className="ml-auto text-xs bg-blue-500/15 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                ✨ Gemini AI
+              </span>
+            )}
+            {article.shap_data.model && !article.shap_data.ai_analyzed && (
+              <span className="ml-auto text-xs bg-gray-700/50 text-gray-500 border border-gray-600/30 px-2 py-0.5 rounded-full">
+                Keyword-based
+              </span>
+            )}
           </div>
+          {/* Gemini summary */}
+          {article.shap_data.summary && (
+            <div className="mb-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+              <div className="text-xs text-blue-400 mb-1">📝 Краткое содержание (Gemini):</div>
+              <div className="text-sm text-gray-300">{article.shap_data.summary}</div>
+            </div>
+          )}
           {article.shap_data.top_signals?.length > 0 && (
             <div className="mb-4">
               <div className="text-xs text-gray-500 mb-2">Сигналы фейка в тексте:</div>

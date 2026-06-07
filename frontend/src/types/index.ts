@@ -49,7 +49,10 @@ export interface Article {
   entities?: Array<{ text: string; label: string }>
   shap_data?: {
     top_signals: string[]
-    fake_score_components: { keyword_signals: number; source_credibility_penalty: number }
+    fake_score_components: Record<string, number>
+    ai_analyzed?: boolean
+    model?: string
+    summary?: string
   }
 }
 
