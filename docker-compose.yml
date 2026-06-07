@@ -105,7 +105,7 @@ services:
       dockerfile: docker/Dockerfile.frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "${APP_PORT:-8080}:80"   # host Nginx проксирует сюда
     depends_on:
       backend:
         condition: service_healthy
