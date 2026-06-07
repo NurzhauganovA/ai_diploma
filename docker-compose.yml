@@ -1,0 +1,92 @@
+# ────────────────────────────────────────────────
+#  FakeGuard — docker compose up --build
+#  После запуска: http://localhost
+#  Логин: admin / admin123
+# ────────────────────────────────────────────────
+
+x-backend-env: &backend-env
+  environment:
+    DEBUG: "True"
+    SECRET_KEY: "fakeguard-dev-secret-key-change-in-production"
+    REDIS_URL: "redis://redis:6379/0"
+    # SQLite хранится в /app/data/ — туда монтируется volume (директория, не файл)
+    DB_PATH: "/app/data/db.sqlite3"
+    # Компания для мониторинга (Google News RSS + ведущие СМИ)
+    MONITORED_COMPANY: "Яндекс"
+    TELEGRAM_BOT_TOKEN: ""
+    OPENAI_API_KEY: ""
+
+x-backend-volumes: &backend-volumes
+  volumes:
+    - db_data:/app/data
+    - media_data:/app/media
+
+services:
+
+  # ── Redis ─────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Django Backend ────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    restart: unless-stopped
+    <<: [*backend-env, *backend-volumes]
+    depends_on:
+      redis:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/app/docker_entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/admin/login/"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  # ── Celery Worker ─────────────────────────────
+  celery:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    restart: unless-stopped
+    <<: [*backend-env, *backend-volumes]
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: celery -A config worker -l info -c 2
+
+  # ── Celery Beat ───────────────────────────────
+  celery-beat:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    restart: unless-stopped
+    <<: [*backend-env, *backend-volumes]
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+  # ── Nginx + React (production build) ──────────
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  media_data:

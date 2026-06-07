@@ -1,0 +1,27 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Системные зависимости
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python зависимости (отдельный слой — кэшируется)
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Код приложения
+COPY backend/ .
+
+# Папка для SQLite базы (volume монтируется сюда)
+RUN mkdir -p /app/data && chmod 777 /app/data
+
+# Права на entrypoint
+RUN chmod +x /app/docker_entrypoint.sh
+
+# Собрать static files для Django Admin
+RUN python manage.py collectstatic --noinput 2>/dev/null || true
+
+EXPOSE 8000
